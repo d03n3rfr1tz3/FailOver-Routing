@@ -1,0 +1,14 @@
+[Unit]
+Description=FailOver Routing Service
+After=network.target iptables.service firewalld.service
+
+[Service]
+User=pi
+Group=pi
+Restart=always
+RestartSec=10
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/failover-routing/daemon_failover_routing.py
+
+[Install]
+WantedBy=multi-user.target

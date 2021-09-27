@@ -3,9 +3,9 @@ A simple showcase of a Multi-WAN FailOver including some basic policy routing us
 
 ## Network Overview
 
-This showcase explicitly uses the network 192.168.0.X and two gateways (192.168.0.1 and 192.168.0.2), that are not separated. If your network uses another IP range, change it accordingly. If you have multiple networks (e.g. 192.168.0.X and 192.168.1.X), you have to get enough ethernet ports (or use WiFi) on your Raspberry Pi and bridge them accordingly. I'm not an expert on this topic, so please don't try to get support on anything, especially the bridging part. But I'm sure you'll find some useful tutorials online.
+This showcase explicitly uses the network 192.168.0.X and two gateways (192.168.0.1 and 192.168.0.2), that are not separated. The IP address of the Raspberry Pi will be 192.168.0.3 in this showcase. If your network uses another IP range, change it accordingly. If you have multiple networks (e.g. 192.168.0.X and 192.168.1.X), you have to get enough ethernet ports (or use WiFi) on your Raspberry Pi and bridge them accordingly. I'm not an expert on this topic, so please don't try to get support on anything, especially the bridging part. But I'm sure you'll find some useful tutorials online.
 
-TODO: IMAGE
+![Network Overview](https://github.com/d03n3rfr1tz3/FailOver-Routing/blob/main/images/network-basic.png)
 
 ## Installation / Configuration
 
@@ -31,7 +31,7 @@ sudo nano /etc/sysctl.conf
 
 ### 3. Prepare the Routing Tables
 
-#### Routing Table Names
+#### a) Routing Table Names
 You'll have to edit */etc/iproute2/rt_tables* and add two lines. These two lines will represent that names of our routing tables later. In my case I just used 'primary' and 'secondary'.
 ```
 sudo nano /etc/iproute2/rt_tables
@@ -39,14 +39,14 @@ sudo nano /etc/iproute2/rt_tables
 > 100     primary<br/>
 > 101     secondary
 
-#### Route via defined Gateway
+#### b) Route via defined Gateway
 After you have prepared the names, you need to prepare the concrete routes. Depending on your setup, this can be a bit tricky. The first route we will add into both tables, basically routes every unknown traffic through a defined gateway. Every other route we have to add just makes sure, that other stuff from the 'main' route (e.g. Docker) does not break. Here are the first and important routes.
 ```
 sudo ip route add table primary 0.0.0.0/0 via 192.168.0.1
 sudo ip route add table secondary 0.0.0.0/0 via 192.168.0.2
 ```
 
-#### OPTIONAL: Copy Routes from 'main' table
+#### c) Copy Routes from 'main' table (OPTIONAL)
 Beware that this step might be optional, but could be important depending on what your Raspberry Pi does besides routing internet traffic. In my case I installed everything on a Raspberry Pi 4 that is also the Host of my Home Assistant, my DHCP, my DNS (via AdGuard) and my MQTT Broker. The latter ran into some trouble with connection timeouts, because the packets did not get routed accordingly into the Docker instances. Strangly enough only the MQTT Broker had problems, everything else seemed to work. To fix that, I had to copy over about 12 lines from the 'main' table. Most of them were put in place by the Home Assistant Supervisor and/or Docker.
 
 After you have added the first line on each routing table, it is recommended (by me) to copy over every single route from the 'main' table, except the first one. To do so, you have to look into your 'main' table by using the following command.
@@ -70,7 +70,7 @@ NOTE: If you made a mistake filling the Routing Table, you can always clear it w
 
 ### 4. Put the systemd Service in place
 
-Now that you prepared the Routing Tables and there content, we need to install the systemd service. This service is a Python script and has a very simple task: Periodically ping a target via each gateway and if something is down, activate/deactivate the routing rules accordingly. It also publishes the state of each WAN into an MQTT Broker. If you don't need that, just remove that part of the script. You can do that! :)
+Now that you prepared the Routing Tables and their content, we need to install the systemd service. This service is a Python script and has a very simple task: Periodically ping a target via each gateway and if something is down, it activates/deactivates the routing rules accordingly. It also publishes the state of each WAN into an MQTT Broker. If you don't need that, just remove that part of the script. You can do that! :)
 
 First off, we need to install Python and if you stay with the MQTT functionality also the Python MQTT package. This can be done easily with the following commands.
 ```
@@ -91,29 +91,29 @@ sudo nano /etc/systemd/system/failover-routing.service
 sudo systemctl enable failover-routing.service
 sudo systemctl start failover-routing.service
 ```
-If everything was done correctly and nothing strange happened in the time between I created this and when you are using it, it already should work. You could change the default gateway of your PC to your new routing Raspberry Pi. But because we are all just humans, I would recommand to at least check the status of the service via using this command. If it crashes you should look into your *journalctl*, hopefully you'll find the reason and then you just fix it (because this is always easily done /s).
+If everything was done correctly and nothing strange happened in the timeframe between I created this and when you are using it, it already should work. You could change the default gateway of your PC to your new routing Raspberry Pi. But because we are all just humans, I would recommand to at least check the status of the service via using the following command. If it crashes you should look into your *journalctl*, hopefully you'll find the reason and then you just fix it (because this is always easily done /s).
 ```
 sudo systemctl status failover-routing.service
 ```
 
 ### 5. Questions? Celebrate!
 
-You probably have done it, congratulation! But maybe you have a few questions. Here are some I think someone could have and to give some insights, that might help.
+You probably have done it, congratulation! But maybe you have a few questions. Here are some I think someone could have and to give some additional insights, that might help or give you some ideas.
 
-#### Why 'primary' and just only 'secondary'?
+#### a) Why 'primary' and not just only 'secondary'?
 
 If you payed close attentation, you might ask yourself, why I did create a Routing Table 'primary' and not just 'secondary', because 'primary' is basically a copy of 'main', while 'secondary' at least has a different gateway.
 
 The thing is, I wanted to build it that way, that I could add some sort of load balancing later. By preparing policy routing for primary and secondary, I can put routes to force traffic through primary and through secondary separately. Then only devices that do not have explicit policy routes would get the default route ('main' table) and at this point, or somewhere inbetween, I can probably add some sort of load balancing later. I'm not sure how, I did not think through that further and I currently do not measure anything that would help implementing a load balancer, but at least the policy routing would already support that.
 
-#### Did you do more of that in your home setup?
+#### b) Did you do more of that in your home setup?
 
-You might be surprised, but yes. Not only do I use the whole thing in my own network, I implemented it twice. Twice? Yes, I'm serious. You know, sometimes you have to restart a Raspberry Pi.
+You might be surprised, but yes. Not only do I use the whole thing in my own network, I implemented it twice. Twice? Yes, I'm serious. You know, sometimes you have to restart a Raspberry Pi or things go downhill just because.
 
 Ok let me start with some basic stuff. I have basically two Raspberry Pis that are mirroring some parts of each other.
 * First RPI: DHCP, DNS (AdGuard), Gateway (and some other stuff)
 * Second RPI: DNS (AdGuard), Gateway
 
-This means, the DHCP issues leases with two local DNS and two local gateways. Both (DNS and Gateway) are these two RPIs. If the OS that gets these information is smart enough, it can handle the downtime of one of these RPIs. On top of that, this FailOver Routing is in place for the traffic routed through each RPI into the concrete Internet Router (primary or secondary). Sounds a bit over the top? Yes, maybe... but it still FeelsGoodMan ;)
+This means, the DHCP issues leases with two local DNS and two local Gateways. Both (DNS and Gateway) are these two RPIs. If the OS that gets these information is smart enough, it can handle the downtime of one of these RPIs. On top of that, this FailOver Routing is in place for the traffic routed through each RPI into the concrete Internet Router (primary or secondary). Sounds a bit over the top? Yes, maybe... but it replaced a costly Business Router, does work way better and of course also FeelsGoodMan ;)
 
-TODO: IMAGE
+![Network with Redundancy](https://github.com/d03n3rfr1tz3/FailOver-Routing/blob/main/images/network-redundancy.png)

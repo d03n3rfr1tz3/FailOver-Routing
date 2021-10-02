@@ -21,7 +21,8 @@ import base64, json, io, os, subprocess, re, ssl, time, datetime
 DEBUG = False
 
 pingInterval = 10                                   # Interval to pause between ping attempts
-pingTargetIp = "8.8.8.8"                            # IP used for pinging
+pingTargetPrimary = "8.8.8.8"                       # primary IP used for pinging
+pingTargetSecondary = "8.8.4.4"                     # secondary IP used for pinging, if the primary was not available
 ipPrimary = "192.168.0.1"                           # IP of your primary gateway/router
 ipSecondary = "192.168.0.2"                         # IP of your secondary gateway/router
 macPrimary = "AB:CD:EF:12:34:56"                    # MAC address of your primary gateway/router
@@ -101,12 +102,13 @@ def pingTargets():
     oldSecondary = activeSecondary
     
     # ping primary and secondary
-    activePrimary = pingTarget(macPrimary, pingTargetIp)
-    activeSecondary = pingTarget(macSecondary, pingTargetIp)
+    activePrimary = pingTarget(macPrimary, pingTargetPrimary)
+    activeSecondary = pingTarget(macSecondary, pingTargetPrimary)
     
-    # if any is offline, retry just to make sure
-    if activePrimary == False: activePrimary = pingTarget(macPrimary, pingTargetIp)
-    if activeSecondary == False: activeSecondary = pingTarget(macSecondary, pingTargetIp)
+    # if any is offline, shortly wait and retry just to make sure
+    if activePrimary == False or activeSecondary == False: time.sleep(5)
+    if activePrimary == False: activePrimary = pingTarget(macPrimary, pingTargetSecondary)
+    if activeSecondary == False: activeSecondary = pingTarget(macSecondary, pingTargetSecondary)
     
     # revert to old state if ping result was not clear
     if activePrimary == 'Unknown': activePrimary = oldPrimary
@@ -127,8 +129,10 @@ def pingTarget(macAddress, ipTarget):
     if pingValid and pingSuccessful:
         return True
     elif pingValid:
+        print("Ping through " + macAddress + " failed: " + out)
         return False
     else:
+        print("Ping through " + macAddress + " unknown: " + out)
         return 'Unknown'
 
 # Clear default gateway multiple times, just to make sure

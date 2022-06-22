@@ -49,8 +49,8 @@ running = True
 activePrimary = False
 activeSecondary = False
 
-regexLostMatcher = re.compile("Lost:", re.M)
-regexLostNoneMatcher = re.compile("Lost: (0|1)", re.M)
+regexRequestMatcher = re.compile("Echo request", re.M)
+regexReplyMatcher = re.compile("Echo reply", re.M)
 
 # MQTT connect event handler
 def on_connect(client, userdata, flags, rc):
@@ -110,10 +110,6 @@ def pingTargets():
     if activePrimary == False: activePrimary = pingTarget(macPrimary, pingTargetSecondary)
     if activeSecondary == False: activeSecondary = pingTarget(macSecondary, pingTargetSecondary)
     
-    # revert to old state if ping result was not clear
-    if activePrimary == 'Unknown': activePrimary = oldPrimary
-    if activeSecondary == 'Unknown': activeSecondary = oldSecondary
-    
     # if any state changed, update routing tables
     if oldPrimary != activePrimary or oldSecondary != activeSecondary:
         processStates()
@@ -123,17 +119,14 @@ def pingTarget(macAddress, ipTarget):
     p = subprocess.Popen(['sudo', 'nping', '--icmp', '--dest-mac', macAddress, ipTarget], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     out, err = p.communicate()
     
-    pingValid = regexLostMatcher.search(out)
-    pingSuccessful = regexLostNoneMatcher.search(out)
+    pingRequests = regexRequestMatcher.findall(out)
+    pingReplies = regexReplyMatcher.findall(out)
     
-    if pingValid and pingSuccessful:
+    if len(pingRequests) <= len(pingReplies) + 1:
         return True
-    elif pingValid:
+    else:
         print("Ping through " + macAddress + " failed: " + out)
         return False
-    else:
-        print("Ping through " + macAddress + " unknown: " + out)
-        return 'Unknown'
 
 # Clear default gateway multiple times, just to make sure
 def clearDefault():

@@ -217,7 +217,11 @@ client.will_set(mqttBaseTopic + "/state", payload="offline", qos=1, retain=True)
 
 # connect to MQTT server
 print("Connecting to " + mqttHostname + " on port " + str(mqttPort))
-client.connect(mqttHostname, mqttPort, mqttConnectionTimeout)
+try:
+    client.connect(mqttHostname, mqttPort, mqttConnectionTimeout)
+except:
+    pingTargets()
+    raise
 
 # start endless loop
 client.loop_start()

@@ -20,7 +20,7 @@ import base64, json, io, os, subprocess, re, ssl, time, datetime
 
 DEBUG = False
 
-pingInterval = 10                                   # Interval to pause between ping attempts
+pingInterval = 15                                   # Interval to pause between ping attempts
 pingTargetPrimary = "8.8.8.8"                       # primary IP used for pinging
 pingTargetSecondary = "8.8.4.4"                     # secondary IP used for pinging, if the primary was not available
 ipPrimary = "192.168.0.1"                           # IP of your primary gateway/router
@@ -109,6 +109,8 @@ def pingTargets():
     if activePrimary == False or activeSecondary == False: time.sleep(5)
     if activePrimary == False: activePrimary = pingTarget(macPrimary, pingTargetSecondary)
     if activeSecondary == False: activeSecondary = pingTarget(macSecondary, pingTargetSecondary)
+    if activePrimary == False: activePrimary = pingTarget(macPrimary, pingTargetPrimary)
+    if activeSecondary == False: activeSecondary = pingTarget(macSecondary, pingTargetPrimary)
     
     # if any state changed, update routing tables
     if oldPrimary != activePrimary or oldSecondary != activeSecondary:
@@ -122,7 +124,7 @@ def pingTarget(macAddress, ipTarget):
     pingRequests = regexRequestMatcher.findall(out)
     pingReplies = regexReplyMatcher.findall(out)
     
-    if len(pingRequests) <= len(pingReplies) + 1:
+    if len(pingRequests) >= 3 and len(pingRequests) <= (len(pingReplies) + 1):
         return True
     else:
         print("Ping through " + macAddress + " failed: " + out)
